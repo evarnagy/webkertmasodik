@@ -1,13 +1,2 @@
-<app-menu (selectedPage)="changePage($event)"></app-menu>
-@if(page === "home"){
-<app-home></app-home>
-} @else if (page === 'configurator') 
-{
-  <app-configurator></app-configurator>
-} @else if (page === 'comparison'){
-  <app-comparison></app-comparison>
-} @else {
-  <app-cart></app-cart>
-}
-
-<!--<router-outlet />-->
+<app-menu></app-menu>
+<router-outlet></router-outlet>

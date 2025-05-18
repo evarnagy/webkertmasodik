@@ -1,14 +1,16 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-
+import { FormsModule } from '@angular/forms';
+import { ProcessorService } from '../../shared/services/processor.service';
 
 export interface BaseComponent {
-  id: number;
+  id?: string;
   name: string;
   price: number;
 }
 
 export interface Processor extends BaseComponent {
+  id: string;
   cores: number;
   speed: number;
 }
@@ -18,38 +20,39 @@ export interface Motherboard extends BaseComponent {
 }
 
 export interface Ram extends BaseComponent {
-  capacity: number; 
+  capacity: number;
   speed: number;
 }
 
 export interface Gpu extends BaseComponent {
-  memory: number; 
+  memory: number;
 }
 
 @Component({
   selector: 'app-configurator',
+  standalone: true,
   templateUrl: './configurator.component.html',
   styleUrls: ['./configurator.component.scss'],
-  imports:[CommonModule]
+  imports: [CommonModule, FormsModule],
 })
-export class ConfiguratorComponent {
+export class ConfiguratorComponent implements OnInit, AfterViewInit, OnDestroy {
 
-  
-  processors: Processor[] = [
-    { id: 1, name: 'Intel i9', price: 500, cores: 8, speed: 3.6 },
-    { id: 2, name: 'AMD Ryzen 7', price: 400, cores: 8, speed: 3.8 }
-  ];
+  processors: Processor[] = [];
+  filteredProcessors: Processor[] = [];
+  topCheapProcessors: Processor[] = [];
+  fastestProcessors: Processor[] = [];
+  highCoreProcessors: Processor[] = [];
   motherboards: Motherboard[] = [
-    { id: 1, name: 'ASUS ROG', price: 250, chipset: 'Z490' },
-    { id: 2, name: 'MSI MAG', price: 200, chipset: 'B550' }
+    { id: '1', name: 'ASUS ROG', price: 250, chipset: 'Z490' },
+    { id: '2', name: 'MSI MAG', price: 200, chipset: 'B550' }
   ];
   rams: Ram[] = [
-    { id: 1, name: 'Corsair Vengeance', price: 100, capacity: 16, speed: 3200 },
-    { id: 2, name: 'G.SKILL Ripjaws', price: 90, capacity: 16, speed: 3000 }
+    { id: '1', name: 'Corsair Vengeance', price: 100, capacity: 16, speed: 3200 },
+    { id: '2', name: 'G.SKILL Ripjaws', price: 90, capacity: 16, speed: 3000 }
   ];
   gpus: Gpu[] = [
-    { id: 1, name: 'NVIDIA RTX 3080', price: 800, memory: 10 },
-    { id: 2, name: 'AMD Radeon RX 6800', price: 750, memory: 16 }
+    { id: '1', name: 'NVIDIA RTX 3080', price: 800, memory: 10 },
+    { id: '2', name: 'AMD Radeon RX 6800', price: 750, memory: 16 }
   ];
 
   selectedProcessor: Processor | null = null;
@@ -58,9 +61,46 @@ export class ConfiguratorComponent {
   selectedGpu: Gpu | null = null;
 
   totalPrice: number = 0;
+  editProcessor: Processor = this.getEmptyProcessor();
 
-  selectComponent(componentType: string, component: BaseComponent) {
-    switch (componentType) {
+  private intervalId: any;
+
+  constructor(private processorService: ProcessorService) {}
+
+ ngOnInit(): void {
+  if (!this.processorService) {
+    console.error('ProcessorService is undefined!');
+    return;
+  }
+
+  this.processorService.getProcessors().subscribe({
+    next: data => {
+      console.log('Processors loaded:', data);
+      this.processors = data;
+    },
+    error: err => {
+      console.error('Error loading processors:', err);
+    }
+    
+  });
+  
+}
+
+
+  ngAfterViewInit(): void {
+    this.intervalId = setInterval(() => {
+      console.log('Aktuális összár:', this.totalPrice, 'USD');
+    }, 5000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+    }
+  }
+
+  selectComponent(type: string, component: BaseComponent) {
+    switch (type) {
       case 'processor':
         this.selectedProcessor = component as Processor;
         break;
@@ -73,19 +113,16 @@ export class ConfiguratorComponent {
       case 'gpu':
         this.selectedGpu = component as Gpu;
         break;
-      default:
-        break;
     }
     this.calculateTotalPrice();
   }
 
   calculateTotalPrice() {
-    let price = 0;
-    if (this.selectedProcessor) price += this.selectedProcessor.price;
-    if (this.selectedMotherboard) price += this.selectedMotherboard.price;
-    if (this.selectedRam) price += this.selectedRam.price;
-    if (this.selectedGpu) price += this.selectedGpu.price;
-    this.totalPrice = price;
+    this.totalPrice =
+      (this.selectedProcessor?.price || 0) +
+      (this.selectedMotherboard?.price || 0) +
+      (this.selectedRam?.price || 0) +
+      (this.selectedGpu?.price || 0);
   }
 
   saveConfiguration() {
@@ -96,5 +133,37 @@ export class ConfiguratorComponent {
       gpu: this.selectedGpu,
       totalPrice: this.totalPrice
     });
+  }
+
+  addProcessor() {
+    const { id, ...processorData } = this.editProcessor;
+    this.processorService.addProcessor(processorData).then(() => {
+      this.editProcessor = this.getEmptyProcessor();
+    });
+  }
+  editProcessorByCopy(processor: any): void {
+  this.editProcessor = { ...processor };
+}
+
+
+  updateProcessor() {
+    if (typeof this.editProcessor.id === 'string') {
+      const { id, ...data } = this.editProcessor;
+      this.processorService.updateProcessor(id, data).then(() => {
+        this.editProcessor = this.getEmptyProcessor();
+      });
+    }
+  }
+
+  deleteProcessor(id: string) {
+    this.processorService.deleteProcessor(id);
+  }
+
+  cancelEdit() {
+    this.editProcessor = this.getEmptyProcessor();
+  }
+
+  private getEmptyProcessor(): Processor {
+    return { id: '', name: '', price: 0, cores: 0, speed: 0 };
   }
 }
